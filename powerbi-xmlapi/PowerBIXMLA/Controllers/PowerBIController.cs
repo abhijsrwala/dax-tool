@@ -5,9 +5,9 @@ using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using System.Data;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 
 namespace YourNamespace.Controllers
 {
@@ -95,26 +95,23 @@ namespace YourNamespace.Controllers
                 
                 var connectionString = $"Data Source={_config.WorkspaceConnection};Initial Catalog={catalog};Provider=MSOLAP;";
                 
-                using var connection = new AdomdConnection(connectionString);
+                // IMPORTANT: Create a new connection string with token embedded directly
+                var connectionStringWithToken = $"{connectionString}Password={accessToken};";
                 
-                try {
-                    var propertyInfo = typeof(AdomdConnection).GetProperty("AccessToken");
-                    if (propertyInfo != null)
-                    {
-                        propertyInfo.SetValue(connection, accessToken);
-                    }
-                } catch (Exception ex) {
-                    _logger.LogWarning($"Could not set AccessToken directly: {ex.Message}");
-                    connection.ConnectionString = $"{connectionString}Password={accessToken};";
-                }
-
+                using var connection = new AdomdConnection(connectionStringWithToken);
+                
+                // No more trying to set AccessToken directly since it's already in connection string
+                _logger.LogInformation("Attempting to open connection for metadata...");
                 connection.Open();
+                _logger.LogInformation("Connection opened successfully for metadata");  
                 
                 // Get tables and their columns
                 var tablesAndColumns = GetTablesAndColumns(connection);
+                _logger.LogInformation($"Found {tablesAndColumns.Count} tables with columns");
                 
                 // Get measures
                 var measures = GetMeasures(connection);
+                _logger.LogInformation($"Found {measures.Count} measures");
                 
                 var metadata = new
                 {
@@ -130,95 +127,146 @@ namespace YourNamespace.Controllers
                 return BadRequest($"Error getting metadata: {ex.Message}\n{ex.InnerException?.Message}");
             }
         }
-
-        private List<TableInfo> GetTablesAndColumns(AdomdConnection connection)
+private List<TableInfo> GetTablesAndColumns(AdomdConnection connection)
+{
+    var tableInfos = new List<TableInfo>();
+    
+    try
+    {
+        _logger.LogInformation("Executing query to get tables and columns");
+      
+        // Simplified query that avoids the ORDER BY issue
+        string query = @"
+            SELECT 
+                [TABLE_NAME] as TableName,
+                [COLUMN_NAME] as ColumnName,
+                [DATA_TYPE] as DataType 
+            FROM $SYSTEM.DBSCHEMA_COLUMNS";
+        
+        using var command = new AdomdCommand(query, connection);
+        using var reader = command.ExecuteReader();
+        
+        var currentTable = "";
+        TableInfo tableInfo = null;
+        
+        // Process results in memory and sort them after fetching
+        var results = new List<(string TableName, string ColumnName, string DataType)>();
+        while (reader.Read())
         {
-            var tableInfos = new List<TableInfo>();
-            
-            // DMV query to get tables and their columns
-            string query = @"
-                SELECT 
-                    [TABLE_NAME] as TableName,
-                    [COLUMN_NAME] as ColumnName,
-                    [DATA_TYPE] as DataType 
-                FROM $SYSTEM.DBSCHEMA_COLUMNS 
-                ORDER BY TableName, ColumnName";
-            
-            using var command = new AdomdCommand(query, connection);
-            using var reader = command.ExecuteReader();
-            
-            var currentTable = "";
-            TableInfo tableInfo = null;
-            
-            while (reader.Read())
+            results.Add((
+                reader["TableName"]?.ToString() ?? "",
+                reader["ColumnName"]?.ToString() ?? "",
+                reader["DataType"]?.ToString() ?? ""
+            ));
+        }
+        
+        // Sort the results in memory
+        results = results.OrderBy(r => r.TableName).ThenBy(r => r.ColumnName).ToList();
+        _logger.LogInformation($"Sorted {results} columns by table and column name");
+        // Process the sorted results
+        foreach (var (tableName, columnName, dataType) in results)
+        {
+            if (currentTable != tableName)
             {
-                var tableName = reader["TableName"].ToString();
-                var columnName = reader["ColumnName"].ToString();
-                var dataType = reader["DataType"].ToString();
-                
-                if (currentTable != tableName)
+                if (tableInfo != null)
                 {
-                    if (tableInfo != null)
-                    {
-                        tableInfos.Add(tableInfo);
-                    }
-                    
-                    tableInfo = new TableInfo
-                    {
-                        Name = tableName,
-                        Columns = new List<ColumnInfo>()
-                    };
-                    
-                    currentTable = tableName;
+                    tableInfos.Add(tableInfo);
                 }
                 
-                tableInfo.Columns.Add(new ColumnInfo
+                tableInfo = new TableInfo
                 {
-                    Name = columnName,
-                    DataType = dataType
-                });
+                    Name = tableName,
+                    Columns = new List<ColumnInfo>()
+                };
+                
+                currentTable = tableName;
             }
             
-            if (tableInfo != null)
+            tableInfo.Columns.Add(new ColumnInfo
             {
-                tableInfos.Add(tableInfo);
+                Name = columnName,
+                DataType = dataType
+            });
+        }
+        
+        if (tableInfo != null)
+        {
+            tableInfos.Add(tableInfo);
+        }
+        
+        _logger.LogInformation($"Successfully retrieved {tableInfos.Count} tables");
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error in GetTablesAndColumns");
+        // Return empty list instead of throwing to allow partial metadata return
+        return new List<TableInfo>();
+    }
+    
+    return tableInfos;
+}
+
+private List<MeasureInfo> GetMeasures(AdomdConnection connection)
+{
+    var measures = new List<MeasureInfo>();
+    
+    try
+    {
+        _logger.LogInformation("Executing query to get measures");
+        
+        // Modified query that avoids the boolean expression issue
+        string query = @"
+        SELECT 
+            [MEASURE_NAME],
+            [MEASURE_CAPTION],
+            [MEASUREGROUP_NAME] as TableName
+        FROM $SYSTEM.MDSCHEMA_MEASURES";
+        
+        using var command = new AdomdCommand(query, connection);
+        using var reader = command.ExecuteReader();
+        
+        while (reader.Read())
+        {
+            // Filter visible measures in memory instead of in query
+            var isVisible = true;
+            try {
+                // Try to get MEASURE_IS_VISIBLE if it exists
+                var visibleObj = reader["MEASURE_IS_VISIBLE"];
+                if (visibleObj != null && visibleObj != DBNull.Value)
+                {
+                    isVisible = Convert.ToBoolean(visibleObj);
+                }
+            }
+            catch {
+                // If the column doesn't exist or can't be converted, keep as visible
+                isVisible = true;
             }
             
-            return tableInfos;
-        }
-
-        private List<MeasureInfo> GetMeasures(AdomdConnection connection)
-        {
-            var measures = new List<MeasureInfo>();
-            
-            // DMV query to get measures
-            string query = @"
-                SELECT 
-                    [MEASURE_NAME] as MeasureName,
-                    [MEASURE_CAPTION] as MeasureCaption,
-                    [MEASURE_AGGREGATOR] as AggregatorType,
-                    [TABLE_NAME] as TableName
-                FROM $SYSTEM.MDSCHEMA_MEASURES
-                WHERE MEASURE_IS_VISIBLE";
-            
-            using var command = new AdomdCommand(query, connection);
-            using var reader = command.ExecuteReader();
-            
-            while (reader.Read())
+            if (isVisible)
             {
                 measures.Add(new MeasureInfo
                 {
-                    Name = reader["MeasureName"].ToString(),
-                    Caption = reader["MeasureCaption"].ToString(),
-                    TableName = reader["TableName"].ToString(),
-                    AggregatorType = reader["AggregatorType"].ToString()
+                    Name = reader["MEASURE_NAME"]?.ToString() ?? "",
+                    Caption = reader["MEASURE_CAPTION"]?.ToString() ?? "",
+                    TableName = reader["TableName"]?.ToString() ?? "",
+                    Expression = ""
                 });
             }
-            
-            return measures;
         }
+        
+        _logger.LogInformation($"Successfully retrieved {measures.Count} measures");
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error in GetMeasures");
+        // Return empty list instead of throwing to allow partial metadata return
+        return new List<MeasureInfo>();
+    }
+    
+    return measures;
+}
 
-        private async Task<string> GetAccessTokenAsync()
+private async Task<string> GetAccessTokenAsync()
         {
             try
             {
@@ -263,6 +311,6 @@ namespace YourNamespace.Controllers
         public string Name { get; set; }
         public string Caption { get; set; }
         public string TableName { get; set; }
-        public string AggregatorType { get; set; }
+        public string Expression { get; set; }
     }
 }

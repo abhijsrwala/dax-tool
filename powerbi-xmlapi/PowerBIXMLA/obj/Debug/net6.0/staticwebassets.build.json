@@ -1,11 +1,12 @@
 {
   "Version": 1,
-  "Hash": "M9O1bMzvJVf3Px+NXjYAULETMdWfpXuXE+viQMsbN70=",
+  "Hash": "c1bxgFidGjXjFI9JV47Rap+CaAUgxg7MbmcVJmlltq8=",
   "Source": "PowerBIXMLA",
   "BasePath": "_content/PowerBIXMLA",
   "Mode": "Default",
   "ManifestType": "Build",
   "ReferencedProjectsConfiguration": [],
   "DiscoveryPatterns": [],
-  "Assets": []
+  "Assets": [],
+  "Endpoints": []
 }

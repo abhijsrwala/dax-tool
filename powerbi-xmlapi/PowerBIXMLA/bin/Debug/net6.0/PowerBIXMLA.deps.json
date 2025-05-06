@@ -299,7 +299,7 @@
           "runtimes/win-x64/native/msasxpress.dll": {
             "rid": "win-x64",
             "assetType": "native",
-            "fileVersion": "2025.170.17.20"
+            "fileVersion": "0.0.0.0"
           }
         }
       },

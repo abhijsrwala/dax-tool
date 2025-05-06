@@ -1,22 +1,22 @@
 {
   "version": 2,
-  "dgSpecHash": "A9fr7Efa/SYXIWmJsllPl7nthEdSLzpoxGhrDi7+N5A9IV4M0bduxLu2jgIwJtqL+ZxqpahsdILKPDMcrseteg==",
+  "dgSpecHash": "/LB1+kGgVTo=",
   "success": true,
-  "projectFilePath": "C:\\Users\\admin123\\dax-tool\\powerbi-xmlapi\\PowerBIXMLA\\PowerBIXMLA.csproj",
+  "projectFilePath": "/Users/syedehsan/Development/uddsha/dax-tool/powerbi-xmlapi/PowerBIXMLA/PowerBIXMLA.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\admin123\\.nuget\\packages\\microsoft.analysisservices.adomdclient\\19.94.1.1\\microsoft.analysisservices.adomdclient.19.94.1.1.nupkg.sha512",
-    "C:\\Users\\admin123\\.nuget\\packages\\microsoft.extensions.apidescription.server\\6.0.5\\microsoft.extensions.apidescription.server.6.0.5.nupkg.sha512",
-    "C:\\Users\\admin123\\.nuget\\packages\\microsoft.identity.client\\4.71.0\\microsoft.identity.client.4.71.0.nupkg.sha512",
-    "C:\\Users\\admin123\\.nuget\\packages\\microsoft.identity.client.broker\\4.65.0\\microsoft.identity.client.broker.4.65.0.nupkg.sha512",
-    "C:\\Users\\admin123\\.nuget\\packages\\microsoft.identity.client.nativeinterop\\0.16.2\\microsoft.identity.client.nativeinterop.0.16.2.nupkg.sha512",
-    "C:\\Users\\admin123\\.nuget\\packages\\microsoft.identitymodel.abstractions\\6.35.0\\microsoft.identitymodel.abstractions.6.35.0.nupkg.sha512",
-    "C:\\Users\\admin123\\.nuget\\packages\\microsoft.openapi\\1.2.3\\microsoft.openapi.1.2.3.nupkg.sha512",
-    "C:\\Users\\admin123\\.nuget\\packages\\swashbuckle.aspnetcore\\6.5.0\\swashbuckle.aspnetcore.6.5.0.nupkg.sha512",
-    "C:\\Users\\admin123\\.nuget\\packages\\swashbuckle.aspnetcore.swagger\\6.5.0\\swashbuckle.aspnetcore.swagger.6.5.0.nupkg.sha512",
-    "C:\\Users\\admin123\\.nuget\\packages\\swashbuckle.aspnetcore.swaggergen\\6.5.0\\swashbuckle.aspnetcore.swaggergen.6.5.0.nupkg.sha512",
-    "C:\\Users\\admin123\\.nuget\\packages\\swashbuckle.aspnetcore.swaggerui\\6.5.0\\swashbuckle.aspnetcore.swaggerui.6.5.0.nupkg.sha512",
-    "C:\\Users\\admin123\\.nuget\\packages\\system.diagnostics.diagnosticsource\\6.0.1\\system.diagnostics.diagnosticsource.6.0.1.nupkg.sha512",
-    "C:\\Users\\admin123\\.nuget\\packages\\system.runtime.compilerservices.unsafe\\6.0.0\\system.runtime.compilerservices.unsafe.6.0.0.nupkg.sha512"
+    "/Users/syedehsan/.nuget/packages/microsoft.analysisservices.adomdclient/19.94.1.1/microsoft.analysisservices.adomdclient.19.94.1.1.nupkg.sha512",
+    "/Users/syedehsan/.nuget/packages/microsoft.extensions.apidescription.server/6.0.5/microsoft.extensions.apidescription.server.6.0.5.nupkg.sha512",
+    "/Users/syedehsan/.nuget/packages/microsoft.identity.client/4.71.0/microsoft.identity.client.4.71.0.nupkg.sha512",
+    "/Users/syedehsan/.nuget/packages/microsoft.identity.client.broker/4.65.0/microsoft.identity.client.broker.4.65.0.nupkg.sha512",
+    "/Users/syedehsan/.nuget/packages/microsoft.identity.client.nativeinterop/0.16.2/microsoft.identity.client.nativeinterop.0.16.2.nupkg.sha512",
+    "/Users/syedehsan/.nuget/packages/microsoft.identitymodel.abstractions/6.35.0/microsoft.identitymodel.abstractions.6.35.0.nupkg.sha512",
+    "/Users/syedehsan/.nuget/packages/microsoft.openapi/1.2.3/microsoft.openapi.1.2.3.nupkg.sha512",
+    "/Users/syedehsan/.nuget/packages/swashbuckle.aspnetcore/6.5.0/swashbuckle.aspnetcore.6.5.0.nupkg.sha512",
+    "/Users/syedehsan/.nuget/packages/swashbuckle.aspnetcore.swagger/6.5.0/swashbuckle.aspnetcore.swagger.6.5.0.nupkg.sha512",
+    "/Users/syedehsan/.nuget/packages/swashbuckle.aspnetcore.swaggergen/6.5.0/swashbuckle.aspnetcore.swaggergen.6.5.0.nupkg.sha512",
+    "/Users/syedehsan/.nuget/packages/swashbuckle.aspnetcore.swaggerui/6.5.0/swashbuckle.aspnetcore.swaggerui.6.5.0.nupkg.sha512",
+    "/Users/syedehsan/.nuget/packages/system.diagnostics.diagnosticsource/6.0.1/system.diagnostics.diagnosticsource.6.0.1.nupkg.sha512",
+    "/Users/syedehsan/.nuget/packages/system.runtime.compilerservices.unsafe/6.0.0/system.runtime.compilerservices.unsafe.6.0.0.nupkg.sha512"
   ],
   "logs": []
 }
