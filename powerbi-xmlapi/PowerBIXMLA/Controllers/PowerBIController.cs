@@ -105,11 +105,11 @@ namespace YourNamespace.Controllers
                 connection.Open();
                 _logger.LogInformation("Connection opened successfully for metadata");  
                 
-                // Get tables and their columns
+                // Get tables and their columns using the DISCOVER_STORAGE_TABLE_COLUMNS DMV
                 var tablesAndColumns = GetTablesAndColumns(connection);
                 _logger.LogInformation($"Found {tablesAndColumns.Count} tables with columns");
                 
-                // Get measures
+                // Get measures using MDSCHEMA_MEASURES
                 var measures = GetMeasures(connection);
                 _logger.LogInformation($"Found {measures.Count} measures");
                 
@@ -127,146 +127,270 @@ namespace YourNamespace.Controllers
                 return BadRequest($"Error getting metadata: {ex.Message}\n{ex.InnerException?.Message}");
             }
         }
-private List<TableInfo> GetTablesAndColumns(AdomdConnection connection)
-{
-    var tableInfos = new List<TableInfo>();
-    
-    try
-    {
-        _logger.LogInformation("Executing query to get tables and columns");
-      
-        // Simplified query that avoids the ORDER BY issue
-        string query = @"
-            SELECT 
-                [TABLE_NAME] as TableName,
-                [COLUMN_NAME] as ColumnName,
-                [DATA_TYPE] as DataType 
-            FROM $SYSTEM.DBSCHEMA_COLUMNS";
-        
-        using var command = new AdomdCommand(query, connection);
-        using var reader = command.ExecuteReader();
-        
-        var currentTable = "";
-        TableInfo tableInfo = null;
-        
-        // Process results in memory and sort them after fetching
-        var results = new List<(string TableName, string ColumnName, string DataType)>();
-        while (reader.Read())
+
+        private List<TableInfo> GetTablesAndColumns(AdomdConnection connection)
         {
-            results.Add((
-                reader["TableName"]?.ToString() ?? "",
-                reader["ColumnName"]?.ToString() ?? "",
-                reader["DataType"]?.ToString() ?? ""
-            ));
-        }
-        
-        // Sort the results in memory
-        results = results.OrderBy(r => r.TableName).ThenBy(r => r.ColumnName).ToList();
-        _logger.LogInformation($"Sorted {results} columns by table and column name");
-        // Process the sorted results
-        foreach (var (tableName, columnName, dataType) in results)
-        {
-            if (currentTable != tableName)
+            var tableInfos = new List<TableInfo>();
+            
+            try
             {
+                _logger.LogInformation("Executing query to get tables and columns using DISCOVER_STORAGE_TABLE_COLUMNS");
+                
+                // Using DISCOVER_STORAGE_TABLE_COLUMNS with the exact query as requested
+                string query = @"
+                    SELECT 
+                        MEASURE_GROUP_NAME,
+                        ATTRIBUTE_NAME 
+                    FROM $SYSTEM.DISCOVER_STORAGE_TABLE_COLUMNS";
+                
+                using var command = new AdomdCommand(query, connection);
+                using var reader = command.ExecuteReader();
+                
+                var columnsByTable = new Dictionary<string, List<ColumnInfo>>();
+                
+                while (reader.Read())
+                {
+                    var tableName = reader["MEASURE_GROUP_NAME"]?.ToString() ?? "";
+                    var columnName = reader["ATTRIBUTE_NAME"]?.ToString() ?? "";
+                    // Since we're not querying TYPE, set a default value
+                    var dataType = "Unknown";
+                    
+                    if (!columnsByTable.ContainsKey(tableName))
+                    {
+                        columnsByTable[tableName] = new List<ColumnInfo>();
+                    }
+                    
+                    columnsByTable[tableName].Add(new ColumnInfo
+                    {
+                        Name = columnName,
+                        DataType = dataType
+                    });
+                }
+                
+                // Convert dictionary to list of TableInfo objects
+                foreach (var kvp in columnsByTable.OrderBy(t => t.Key))
+                {
+                    tableInfos.Add(new TableInfo
+                    {
+                        Name = kvp.Key,
+                        Columns = kvp.Value.OrderBy(c => c.Name).ToList()
+                    });
+                }
+                
+                _logger.LogInformation($"Successfully retrieved {tableInfos.Count} tables using DISCOVER_STORAGE_TABLE_COLUMNS");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in GetTablesAndColumns using DISCOVER_STORAGE_TABLE_COLUMNS");
+                // Try fallback method
+                _logger.LogInformation("Attempting fallback method for getting tables and columns");
+                return GetTablesAndColumnsFallback(connection);
+            }
+            
+            return tableInfos;
+        }
+
+        private List<TableInfo> GetTablesAndColumnsFallback(AdomdConnection connection)
+        {
+            var tableInfos = new List<TableInfo>();
+            
+            try
+            {
+                _logger.LogInformation("Executing fallback query to get tables and columns");
+                
+                // Fallback to DBSCHEMA_COLUMNS if DISCOVER_STORAGE_TABLE_COLUMNS fails
+                string query = @"
+                    SELECT 
+                        [TABLE_NAME] as TableName,
+                        [COLUMN_NAME] as ColumnName,
+                        [DATA_TYPE] as DataType 
+                    FROM $SYSTEM.DBSCHEMA_COLUMNS";
+                
+                using var command = new AdomdCommand(query, connection);
+                using var reader = command.ExecuteReader();
+                
+                // Process results in memory and sort them after fetching
+                var results = new List<(string TableName, string ColumnName, string DataType)>();
+                while (reader.Read())
+                {
+                    results.Add((
+                        reader["TableName"]?.ToString() ?? "",
+                        reader["ColumnName"]?.ToString() ?? "",
+                        reader["DataType"]?.ToString() ?? ""
+                    ));
+                }
+                
+                // Sort the results in memory
+                results = results.OrderBy(r => r.TableName).ThenBy(r => r.ColumnName).ToList();
+                _logger.LogInformation($"Sorted {results.Count} columns by table and column name");
+                
+                // Process the sorted results
+                var currentTable = "";
+                TableInfo tableInfo = null;
+                
+                foreach (var (tableName, columnName, dataType) in results)
+                {
+                    if (currentTable != tableName)
+                    {
+                        if (tableInfo != null)
+                        {
+                            tableInfos.Add(tableInfo);
+                        }
+                        
+                        tableInfo = new TableInfo
+                        {
+                            Name = tableName,
+                            Columns = new List<ColumnInfo>()
+                        };
+                        
+                        currentTable = tableName;
+                    }
+                    
+                    tableInfo.Columns.Add(new ColumnInfo
+                    {
+                        Name = columnName,
+                        DataType = dataType
+                    });
+                }
+                
                 if (tableInfo != null)
                 {
                     tableInfos.Add(tableInfo);
                 }
                 
-                tableInfo = new TableInfo
-                {
-                    Name = tableName,
-                    Columns = new List<ColumnInfo>()
-                };
+                _logger.LogInformation($"Successfully retrieved {tableInfos.Count} tables using fallback method");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in GetTablesAndColumnsFallback");
+                // Return empty list instead of throwing to allow partial metadata return
+                return new List<TableInfo>();
+            }
+            
+            return tableInfos;
+        }
+
+        private List<MeasureInfo> GetMeasures(AdomdConnection connection)
+        {
+            var measures = new List<MeasureInfo>();
+            
+            try
+            {
+                _logger.LogInformation("Executing query to get measures");
                 
-                currentTable = tableName;
-            }
-            
-            tableInfo.Columns.Add(new ColumnInfo
-            {
-                Name = columnName,
-                DataType = dataType
-            });
-        }
-        
-        if (tableInfo != null)
-        {
-            tableInfos.Add(tableInfo);
-        }
-        
-        _logger.LogInformation($"Successfully retrieved {tableInfos.Count} tables");
-    }
-    catch (Exception ex)
-    {
-        _logger.LogError(ex, "Error in GetTablesAndColumns");
-        // Return empty list instead of throwing to allow partial metadata return
-        return new List<TableInfo>();
-    }
-    
-    return tableInfos;
-}
-
-private List<MeasureInfo> GetMeasures(AdomdConnection connection)
-{
-    var measures = new List<MeasureInfo>();
-    
-    try
-    {
-        _logger.LogInformation("Executing query to get measures");
-        
-        // Modified query that avoids the boolean expression issue
-        string query = @"
-        SELECT 
-            [MEASURE_NAME],
-            [MEASURE_CAPTION],
-            [MEASUREGROUP_NAME] as TableName
-        FROM $SYSTEM.MDSCHEMA_MEASURES";
-        
-        using var command = new AdomdCommand(query, connection);
-        using var reader = command.ExecuteReader();
-        
-        while (reader.Read())
-        {
-            // Filter visible measures in memory instead of in query
-            var isVisible = true;
-            try {
-                // Try to get MEASURE_IS_VISIBLE if it exists
-                var visibleObj = reader["MEASURE_IS_VISIBLE"];
-                if (visibleObj != null && visibleObj != DBNull.Value)
+                // Standard query for measures
+                string query = @"
+                SELECT 
+                    [MEASURE_NAME],
+                    [MEASURE_CAPTION],
+                    [MEASUREGROUP_NAME] as TableName
+                FROM $SYSTEM.MDSCHEMA_MEASURES";
+                
+                using var command = new AdomdCommand(query, connection);
+                using var reader = command.ExecuteReader();
+                
+                while (reader.Read())
                 {
-                    isVisible = Convert.ToBoolean(visibleObj);
+                    // Filter visible measures in memory instead of in query
+                    var isVisible = true;
+                    try {
+                        // Try to get MEASURE_IS_VISIBLE if it exists
+                        var visibleObj = reader["MEASURE_IS_VISIBLE"];
+                        if (visibleObj != null && visibleObj != DBNull.Value)
+                        {
+                            isVisible = Convert.ToBoolean(visibleObj);
+                        }
+                    }
+                    catch {
+                        // If the column doesn't exist or can't be converted, keep as visible
+                        isVisible = true;
+                    }
+                    
+                    if (isVisible)
+                    {
+                        measures.Add(new MeasureInfo
+                        {
+                            Name = reader["MEASURE_NAME"]?.ToString() ?? "",
+                            Caption = reader["MEASURE_CAPTION"]?.ToString() ?? "",
+                            TableName = reader["TableName"]?.ToString() ?? "",
+                            Expression = ""  // We're not querying EXPRESSION field
+                        });
+                    }
                 }
+                
+                _logger.LogInformation($"Successfully retrieved {measures.Count} measures");
             }
-            catch {
-                // If the column doesn't exist or can't be converted, keep as visible
-                isVisible = true;
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in GetMeasures");
+                // Try fallback method without EXPRESSION field
+                return GetMeasuresFallback(connection);
             }
             
-            if (isVisible)
-            {
-                measures.Add(new MeasureInfo
-                {
-                    Name = reader["MEASURE_NAME"]?.ToString() ?? "",
-                    Caption = reader["MEASURE_CAPTION"]?.ToString() ?? "",
-                    TableName = reader["TableName"]?.ToString() ?? "",
-                    Expression = ""
-                });
-            }
+            return measures;
         }
-        
-        _logger.LogInformation($"Successfully retrieved {measures.Count} measures");
-    }
-    catch (Exception ex)
-    {
-        _logger.LogError(ex, "Error in GetMeasures");
-        // Return empty list instead of throwing to allow partial metadata return
-        return new List<MeasureInfo>();
-    }
-    
-    return measures;
-}
 
-private async Task<string> GetAccessTokenAsync()
+        private List<MeasureInfo> GetMeasuresFallback(AdomdConnection connection)
+        {
+            var measures = new List<MeasureInfo>();
+            
+            try
+            {
+                _logger.LogInformation("Executing fallback query to get measures");
+                
+                // Fallback query without EXPRESSION field
+                string query = @"
+                SELECT 
+                    [MEASURE_NAME],
+                    [MEASURE_CAPTION],
+                    [MEASUREGROUP_NAME] as TableName
+                FROM $SYSTEM.MDSCHEMA_MEASURES";
+                
+                using var command = new AdomdCommand(query, connection);
+                using var reader = command.ExecuteReader();
+                
+                while (reader.Read())
+                {
+                    // Filter visible measures in memory instead of in query
+                    var isVisible = true;
+                    try {
+                        // Try to get MEASURE_IS_VISIBLE if it exists
+                        var visibleObj = reader["MEASURE_IS_VISIBLE"];
+                        if (visibleObj != null && visibleObj != DBNull.Value)
+                        {
+                            isVisible = Convert.ToBoolean(visibleObj);
+                        }
+                    }
+                    catch {
+                        // If the column doesn't exist or can't be converted, keep as visible
+                        isVisible = true;
+                    }
+                    
+                    if (isVisible)
+                    {
+                        measures.Add(new MeasureInfo
+                        {
+                            Name = reader["MEASURE_NAME"]?.ToString() ?? "",
+                            Caption = reader["MEASURE_CAPTION"]?.ToString() ?? "",
+                            TableName = reader["TableName"]?.ToString() ?? "",
+                            Expression = ""
+                        });
+                    }
+                }
+                
+                _logger.LogInformation($"Successfully retrieved {measures.Count} measures using fallback method");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in GetMeasuresFallback");
+                // Return empty list instead of throwing to allow partial metadata return
+                return new List<MeasureInfo>();
+            }
+            
+            return measures;
+        }
+
+        private async Task<string> GetAccessTokenAsync()
         {
             try
             {

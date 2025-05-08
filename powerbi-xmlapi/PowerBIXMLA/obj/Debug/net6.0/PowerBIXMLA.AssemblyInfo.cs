@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("PowerBIXMLA")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+bedbc11231c23a1a7b0d7c357dc81af83f46572b")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b5c6b3b480c57c1160cb1a19a8e7247c947671db")]
 [assembly: System.Reflection.AssemblyProductAttribute("PowerBIXMLA")]
 [assembly: System.Reflection.AssemblyTitleAttribute("PowerBIXMLA")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
